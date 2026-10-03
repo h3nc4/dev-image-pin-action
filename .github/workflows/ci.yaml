@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright (c) 2026 Henrique Almeida <me@h3nc4.com>
+
+name: CI
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run actions/checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Lint shell scripts
+        run: shellcheck -o all pin.sh bump.sh release.sh tests/*.sh
+
+  test:
+    name: Test bump and release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run actions/checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Walk every decision against a throwaway repository
+        run: ./tests/actions.test.sh

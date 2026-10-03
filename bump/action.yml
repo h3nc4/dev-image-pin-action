@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright (c) 2026 Henrique Almeida <me@h3nc4.com>
+
+name: Bump dev container pin
+description: >
+  Moves a pull request's dev container pin to one past the base branch's when the change touches
+  the image inputs, and pushes that commit to the pull request's branch.
+author: Henrique Almeida
+
+branding:
+  icon: arrow-up-circle
+  color: blue
+
+inputs:
+  devcontainer-file:
+    description: Dev container definition whose image key carries the pin.
+    required: false
+    default: .devcontainer.json
+  image-inputs:
+    description: >
+      Space-separated paths that decide a bump. Give the same list as h3nc4/dev-image-action,
+      so a change that makes CI build a candidate is the change that gets a new version.
+    required: false
+    default: docker/dev.Dockerfile scripts/entrypoint.sh scripts/switch-user.sh
+  base-ref:
+    description: Branch the next version is counted from.
+    required: false
+    default: ${{ github.event.pull_request.base.ref }}
+  head-ref:
+    description: Branch the pin commit is pushed to.
+    required: false
+    default: ${{ github.head_ref }}
+  author-name:
+    description: >
+      Author of the pin commit. Renovate stops rebasing a branch with a commit by an author
+      outside gitIgnoredAuthors, so keep this and that list in step.
+    required: false
+    default: github-actions[bot]
+  author-email:
+    description: Email of the pin commit's author, the value gitIgnoredAuthors matches.
+    required: false
+    default: 41898282+github-actions[bot]@users.noreply.github.com
+  commit-message:
+    description: Commit title, followed by the new version.
+    required: false
+    default: Bump dev container to
+
+outputs:
+  bumped:
+    description: true when a pin commit was pushed, false when the inputs are untouched or the pin was already moved.
+    value: ${{ steps.bump.outputs.bumped }}
+  image:
+    description: Image the pull request now pins, empty when the inputs are untouched.
+    value: ${{ steps.bump.outputs.image }}
+  version:
+    description: Version the pull request now pins, empty when the inputs are untouched.
+    value: ${{ steps.bump.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - id: bump
+      shell: sh
+      run: "${{ github.action_path }}/../bump.sh"
+      env:
+        DEVCONTAINER_FILE: ${{ inputs.devcontainer-file }}
+        IMAGE_INPUTS: ${{ inputs.image-inputs }}
+        BASE_REF: ${{ inputs.base-ref }}
+        HEAD_REF: ${{ inputs.head-ref }}
+        AUTHOR_NAME: ${{ inputs.author-name }}
+        AUTHOR_EMAIL: ${{ inputs.author-email }}
+        COMMIT_MESSAGE: ${{ inputs.commit-message }}

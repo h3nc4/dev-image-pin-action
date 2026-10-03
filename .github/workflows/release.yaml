@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright (c) 2026 Henrique Almeida <me@h3nc4.com>
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  major-tag:
+    name: Point the major tag at this release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Run actions/checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Verify the tag is on main
+        run: |
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "::error::${GITHUB_REF_NAME} is not on main, so it will not move the major tag"
+            exit 1
+          fi
+      - name: Move the major tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          core="${version%%[-+]*}"
+          valid=""
+          case "${core}" in # First match wins, so the rejections come first
+            *[!0-9.]* | *.*.*.*) ;;
+            [0-9]*.[0-9]*.[0-9]*) valid="yes" ;;
+          esac
+          if [ -z "${valid}" ]; then
+            echo "::error::${GITHUB_REF_NAME} is not vmajor.minor.patch"
+            exit 1
+          fi
+          # v*.*.* also matches v1.2.3-rc1, and a prerelease is not what @v1 should follow.
+          if [ "${core}" != "${version}" ]; then
+            echo "::notice::${GITHUB_REF_NAME} is a prerelease, so the major tag stays put"
+            exit 0
+          fi
+          major="v${core%%.*}"
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${major}" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${major}" \
+              -f "sha=${GITHUB_SHA}" -F force=true >/dev/null
+            echo "::notice::moved ${major} to ${GITHUB_REF_NAME} (${GITHUB_SHA})"
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f "ref=refs/tags/${major}" -f "sha=${GITHUB_SHA}" >/dev/null
+            echo "::notice::created ${major} at ${GITHUB_REF_NAME} (${GITHUB_SHA})"
+          fi

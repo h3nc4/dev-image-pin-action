@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright (c) 2026 Henrique Almeida <me@h3nc4.com>
+
+name: Release pinned dev container
+description: >
+  Builds and pushes whichever images named in the dev container pin the registry lacks. The
+  registry is the record of a release, so a version already there is never pushed again.
+author: Henrique Almeida
+
+branding:
+  icon: package
+  color: blue
+
+inputs:
+  devcontainer-file:
+    description: Dev container definition whose image key carries the pin.
+    required: false
+    default: .devcontainer.json
+  image-inputs:
+    description: >
+      Space-separated paths that decide a rebuild, the same list the bump reads. A published pin
+      with any of them moved since the commit that set it fails the job, since that change
+      skipped the bump.
+    required: false
+    default: docker/dev.Dockerfile scripts/entrypoint.sh scripts/switch-user.sh
+  dockerfiles:
+    description: >
+      Space-separated Dockerfiles to publish, each named <flavour>.Dockerfile. dev.Dockerfile
+      publishes the pinned repository, and any other flavour publishes it with -dev swapped
+      for -<flavour>, so docker/ci.Dockerfile beside h3nc4/app-dev publishes h3nc4/app-ci.
+    required: false
+    default: docker/dev.Dockerfile
+
+outputs:
+  released:
+    description: true when an image was pushed, false when the registry already held every one.
+    value: ${{ steps.release.outputs.released }}
+  version:
+    description: Version the pin names.
+    value: ${{ steps.release.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - id: release
+      shell: sh
+      run: "${{ github.action_path }}/../release.sh"
+      env:
+        DEVCONTAINER_FILE: ${{ inputs.devcontainer-file }}
+        IMAGE_INPUTS: ${{ inputs.image-inputs }}
+        DOCKERFILES: ${{ inputs.dockerfiles }}

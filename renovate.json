@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices"
+  ],
+  "reviewers": [
+    "h3nc4"
+  ],
+  "assignAutomerge": true,
+  "prConcurrentLimit": 0,
+  "prHourlyLimit": 0,
+  "packageRules": [
+    {
+      "description": "Auto-merge all minor, patch, pin, and digest updates",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "addLabels": ["automerge"],
+      "automerge": true,
+      "platformAutomerge": true
+    }
+  ]
+}
