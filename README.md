@@ -107,6 +107,8 @@ A push to the default branch that changes an image input without moving the pin 
 
 `release` builds with plain `docker build`, so a Forgejo runner whose buildx builder cannot reach the registry works unchanged. GitHub's runners use the same command through their default builder.
 
+A push answered with a 429 is sent again after 15 seconds, up to four attempts, because a registry behind a rate limit on `/v2/token` refuses the burst of token requests a login, a manifest read and two pushes make together. Pushing the same tag twice stores the same image, which makes the repeat safe.
+
 ## Tests
 
 `./tests/actions.test.sh` walks `pin.sh`, `bump.sh` and `release.sh` through a throwaway repository with a bare remote, with docker replaced by a stub that records each call. It needs git alone.

@@ -95,10 +95,28 @@ fi
 for pair in ${missing}; do
   "${docker}" build -f "${pair%%=*}" -t "${pair#*=}:${version}" -t "${pair#*=}:latest" .
 done
+push() { # $1=ref. A push is idempotent, so a rate-limited one is sent again once the block lifts.
+  attempt=1
+  while ! out="$("${docker}" push "$1" 2>&1)"; do
+    printf '%s\n' "${out}" >&2
+    case "${out}" in
+      *"429"* | *"Too Many Requests"* | *"toomanyrequests"*) ;;
+      *) return 1 ;;
+    esac
+    if [ "${attempt}" -ge 4 ]; then
+      return 1
+    fi
+    echo "${1} was rate limited, pushing again in ${PUSH_RETRY_DELAY:-15}s" >&2
+    sleep "${PUSH_RETRY_DELAY:-15}"
+    attempt=$((attempt + 1))
+  done
+  printf '%s\n' "${out}"
+}
+
 published=""
 for pair in ${missing}; do
-  "${docker}" push "${pair#*=}:${version}"
-  "${docker}" push "${pair#*=}:latest"
+  push "${pair#*=}:${version}"
+  push "${pair#*=}:latest"
   published="${published} ${pair#*=}:${version}"
 done
 echo "::notice::published${published}"
