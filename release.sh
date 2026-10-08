@@ -56,8 +56,9 @@ for pair in ${images}; do
     echo "${ref} is already published" >&2
     continue
   fi
+  # Docker Hub's absent tag reads "no such manifest", and Forgejo's reads "manifest unknown".
   case "${probe}" in
-    *"no such manifest"*) missing="${missing} ${pair}" ;;
+    *"no such manifest"* | *"manifest unknown"*) missing="${missing} ${pair}" ;;
     *)
       echo "::error::could not ask the registry for ${ref}: ${probe}"
       exit 1
