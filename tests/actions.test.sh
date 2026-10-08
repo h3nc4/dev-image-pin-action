@@ -94,7 +94,15 @@ case "$1" in
     fi
     exit 1
     ;;
-  push) echo "$2" >>"${work}/registry" ;;
+  push)
+    if grep -qxF -- "$2" "${work}/limited"; then
+      grep -vxF -- "$2" "${work}/limited" >"${work}/limited.next" || true
+      mv "${work}/limited.next" "${work}/limited"
+      echo "unexpected status from POST request to https://registry/v2/token: 429 Too Many Requests" >&2
+      exit 1
+    fi
+    echo "$2" >>"${work}/registry"
+    ;;
   *) ;;
 esac
 echo "$*" >>"${work}/docker.log"
@@ -103,6 +111,7 @@ chmod +x "${work}/docker"
 : >"${work}/registry"
 : >"${work}/refused"
 : >"${work}/missing"
+: >"${work}/limited"
 git init -q --bare -b main "${remote}"
 git init -q -b main "${repo}"
 cd "${repo}"
@@ -230,6 +239,15 @@ echo "manifest unknown" >"${work}/missing"
 run release.sh
 expect "publishes a pin Forgejo's registry calls unknown" "0 true 10" outcome released version
 : >"${work}/missing"
+
+echo 'RUN true' >>docker/dev.Dockerfile
+pin h3nc4/app-dev:11
+git commit -qam "change image and pin"
+echo "h3nc4/app-dev:11" >"${work}/limited"
+run release.sh PUSH_RETRY_DELAY=0
+expect "pushes again after a rate limit" "0 true 11" outcome released version
+expect "and the registry holds the version" "1" grep -c -x -F "h3nc4/app-dev:11" "${work}/registry"
+expect_log "says it waited" "rate limited"
 
 echo
 if [ "${failures}" -ne 0 ]; then
