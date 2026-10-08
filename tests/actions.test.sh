@@ -76,6 +76,7 @@ run() { # $1=script, rest: VAR=value overrides. Sets status to the script's exit
 }
 
 # Plays the registry from a file of pushed refs, and fails a manifest read for a ref in refused.
+# An absent ref answers as Docker Hub does, or with the text in missing, as Forgejo's registry does.
 cat >"${work}/docker" <<'STUB'
 #!/bin/sh
 work="${STUB_DIR:?}"
@@ -86,7 +87,11 @@ case "$1" in
       exit 1
     fi
     grep -qxF -- "$3" "${work}/registry" && exit 0
-    echo "no such manifest: docker.io/$3" >&2
+    if [ -s "${work}/missing" ]; then
+      cat "${work}/missing" >&2
+    else
+      echo "no such manifest: docker.io/$3" >&2
+    fi
     exit 1
     ;;
   push) echo "$2" >>"${work}/registry" ;;
@@ -97,6 +102,7 @@ STUB
 chmod +x "${work}/docker"
 : >"${work}/registry"
 : >"${work}/refused"
+: >"${work}/missing"
 git init -q --bare -b main "${remote}"
 git init -q -b main "${repo}"
 cd "${repo}"
@@ -216,6 +222,14 @@ run release.sh
 expect "publishes a pin brought in by a merge commit" "0 true 9" outcome released version
 run release.sh
 expect "and counts the merge as the pin commit" "0 false" outcome released
+
+echo 'RUN true' >>docker/dev.Dockerfile
+pin h3nc4/app-dev:10
+git commit -qam "change image and pin"
+echo "manifest unknown" >"${work}/missing"
+run release.sh
+expect "publishes a pin Forgejo's registry calls unknown" "0 true 10" outcome released version
+: >"${work}/missing"
 
 echo
 if [ "${failures}" -ne 0 ]; then
